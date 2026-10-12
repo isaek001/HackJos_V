@@ -158,7 +158,7 @@ const ADMIN_KEY = 'hackjos2026.admin'
  * bar — someone determined can still inspect the bundle. For real
  * protection, put the admin area behind Supabase Auth instead.
  */
-const ADMIN_PASSCODE = import.meta.env.VITE_ADMIN_PASSCODE || 'HACKJOS_V'
+const ADMIN_PASSCODE = (import.meta.env.VITE_ADMIN_PASSCODE || '').trim()
 
 export function isAdminUnlocked() {
   try {
@@ -170,7 +170,8 @@ export function isAdminUnlocked() {
 
 export function unlockAdmin(code) {
   // Case-sensitive: only surrounding whitespace is trimmed.
-  const valid = String(code ?? '').trim() === ADMIN_PASSCODE
+  // With no passcode configured, the admin area is unreachable.
+  const valid = ADMIN_PASSCODE.length > 0 && String(code ?? '').trim() === ADMIN_PASSCODE
   if (valid) {
     try {
       window.sessionStorage.setItem(ADMIN_KEY, '1')
