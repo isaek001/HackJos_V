@@ -29,6 +29,9 @@ import {
   lockAdmin,
   removeVolunteer,
   saveVolunteer,
+  setTeamEnabled,
+  getTeamSettings,
+  subscribeTeamSettings,
   subscribeVolunteers,
   toCsv,
   unlockAdmin,
@@ -421,7 +424,14 @@ function Field({
 /* ---------- Application Form ---------- */
 const AVAILABILITY = 'All 3 days (Nov 4–6)'
 
-function ApplicationForm({ team, onTeamChange, onSubmitted, count }) {
+function ApplicationForm({
+  team,
+  onTeamChange,
+  onSubmitted,
+  count,
+  enabledTeams,
+  settingsPending,
+}) {
   const [form, setForm] = useState(() => ({
     name: '',
     email: '',
@@ -435,6 +445,24 @@ function ApplicationForm({ team, onTeamChange, onSubmitted, count }) {
   const [saving, setSaving] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const submittingRef = useRef(false)
+
+  // Teams an admin has switched off are not offered.
+  const availableTeams = TEAMS.filter((t) => enabledTeams[t.id] !== false)
+  const noneAvailable = availableTeams.length === 0
+
+  // Until the first settings read settles we cannot know which teams are
+  // open, so the picker stays inert and the submit button stays disabled.
+  // Without this the form is briefly fully interactive, which would let a
+  // volunteer submit to a team that had just been closed.
+  const teamsSettling = Boolean(settingsPending) && !noneAvailable
+
+  // If the chosen team gets disabled while the form is open, clear it.
+  useEffect(() => {
+    if (form.team && !availableTeams.some((t) => t.id === form.team)) {
+      setForm((f) => ({ ...f, team: '' }))
+      set('team', '')
+    }
+  }, [enabledTeams])
 
   const set = (k, v) => {
     setForm((f) => ({ ...f, [k]: v }))
@@ -457,7 +485,9 @@ function ApplicationForm({ team, onTeamChange, onSubmitted, count }) {
     )
       errs.email = 'Enter a valid email address.'
     if (form.phone.trim().length < 7) errs.phone = 'Enter a reachable phone number.'
-    if (!form.team) errs.team = 'Select one of the six teams below.'
+    if (noneAvailable)
+      errs.team = 'Applications are closed right now. Please check back soon.'
+    else if (!form.team) errs.team = 'Select one of the teams below.'
     if (!form.consent) errs.consent = 'Please confirm your availability to continue.'
     setErrors(errs)
     if (Object.keys(errs).length) {
@@ -625,14 +655,21 @@ function ApplicationForm({ team, onTeamChange, onSubmitted, count }) {
           <p id="v-team-hint" className="fg-sub mb-3 text-[13px]">
             Pick one team you can switch later if your plans change.
           </p>
+          {noneAvailable && (
+            <p className="mb-3 rounded-lg border border-white/20 bg-black/25 px-4 py-3 text-[13.5px] leading-relaxed text-white/90">
+              Volunteer applications are currently closed. Please check back soon.
+            </p>
+          )}
           <div
             className="grid gap-2"
             role="radiogroup"
             aria-label="Preferred team"
             aria-describedby="v-team-hint"
             aria-invalid={hasError('team') || undefined}
+            aria-busy={teamsSettling || undefined}
+            data-pending={teamsSettling || undefined}
           >
-            {TEAMS.map((t) => {
+            {availableTeams.map((t) => {
               const active = form.team === t.id
               return (
                 <label key={t.id} className="tile" data-active={active}>
@@ -642,6 +679,8 @@ function ApplicationForm({ team, onTeamChange, onSubmitted, count }) {
                     name="team"
                     value={t.id}
                     checked={active}
+                    disabled={teamsSettling}
+                    aria-disabled={teamsSettling || undefined}
                     className="absolute inset-0 cursor-pointer opacity-0"
                     onChange={() => pickTeam(t.id)}
                   />
@@ -799,11 +838,15 @@ function ApplicationForm({ team, onTeamChange, onSubmitted, count }) {
         {/* Submit */}
         <button
           type="submit"
-          disabled={saving}
-          aria-busy={saving}
+          disabled={saving || noneAvailable || teamsSettling}
+          aria-busy={saving || teamsSettling || undefined}
           className="btn btn-fg btn-lg pressable mt-6 w-full"
         >
-          {saving ? (
+          {noneAvailable ? (
+            'Applications are closed'
+          ) : teamsSettling ? (
+            'Checking team availability…'
+          ) : saving ? (
             <>
               <Loader2 className="spin h-4 w-4" aria-hidden />
               Submitting your application…
@@ -932,26 +975,42 @@ function EventMeta() {
 }
 
 /* ---------- Teams reference ---------- */
-function TeamsReference({ selected }) {
+function TeamsReference({ selected, enabledTeams }) {
+  const open = TEAMS.filter((t) => enabledTeams[t.id] !== false)
   return (
     <div className="panel-green">
       <h3 className="pg-title">The six teams</h3>
       <p className="pg-body mt-1.5 mb-3">
-        {selected ? 'Your current pick is highlighted.' : 'Find the crew that fits you.'}
+        {open.length === 0
+          ? 'Applications are closed at the moment.'
+          : open.length < TEAMS.length
+            ? `${open.length} of ${TEAMS.length} teams are accepting volunteers.`
+            : selected
+              ? 'Your current pick is highlighted.'
+              : 'Find the crew that fits you.'}
       </p>
       <ul className="space-y-0.5">
         {TEAMS.map((t) => {
           const active = selected === t.id
+          const isOpen = enabledTeams[t.id] !== false
           return (
-            <li key={t.id} className="pg-team" data-active={active}>
+            <li
+              key={t.id}
+              className="pg-team"
+              data-active={active}
+              style={isOpen ? undefined : { opacity: 0.42 }}
+            >
               <span className="pg-chip">
                 <t.icon className="h-4 w-4" strokeWidth={2.2} aria-hidden />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate pg-name">{t.name}</span>
-                <span className="block truncate pg-desc">{t.short}</span>
+                <span className="block truncate pg-desc">
+                  {isOpen ? t.short : 'Applications closed'}
+                </span>
               </span>
               {active && <span className="pg-pill">Pick</span>}
+              {!isOpen && <span className="pg-closed">Closed</span>}
             </li>
           )
         })}
@@ -1003,6 +1062,8 @@ function Site() {
   const [team, setTeam] = useState('')
   const [lastRecord, setLastRecord] = useState(null)
   const [count, setCount] = useState(0)
+  const [enabledTeams, setEnabledTeams] = useState({})
+  const [teamsPending, setTeamsPending] = useState(true)
 
   useReveal([team, lastRecord])
 
@@ -1015,6 +1076,28 @@ function Site() {
   useEffect(() => {
     reloadCount()
   }, [lastRecord])
+
+  // Which teams are open. Admins can close teams; the form follows.
+  useEffect(() => {
+    let alive = true
+    const load = () => {
+      getTeamSettings()
+        .then((s) => {
+          if (alive) setEnabledTeams(s)
+        })
+        .catch(() => {})
+        .finally(() => {
+          // Never leave the form stuck behind the pending state.
+          if (alive) setTeamsPending(false)
+        })
+    }
+    load()
+    const unsub = subscribeTeamSettings(load)
+    return () => {
+      alive = false
+      unsub()
+    }
+  }, [])
 
   const scrollToForm = () =>
     requestAnimationFrame(() =>
@@ -1065,6 +1148,8 @@ function Site() {
                 team={team}
                 onTeamChange={setTeam}
                 count={count}
+                enabledTeams={enabledTeams}
+                settingsPending={teamsPending}
                 onSubmitted={(rec) => {
                   setLastRecord(rec)
                   reloadCount()
@@ -1076,7 +1161,7 @@ function Site() {
 
           <aside className="space-y-4 lg:sticky lg:top-20">
             <EventMeta />
-            <TeamsReference selected={team} />
+            <TeamsReference selected={team} enabledTeams={enabledTeams} />
             <NextSteps />
           </aside>
         </div>
@@ -1099,6 +1184,8 @@ function Admin() {
   const [rows, setRows] = useState([])
   const [query, setQuery] = useState('')
   const [teamFilter, setTeamFilter] = useState('all')
+  const [enabledTeams, setEnabledTeams] = useState({})
+  const [savingTeam, setSavingTeam] = useState('')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [actionError, setActionError] = useState('')
@@ -1138,11 +1225,24 @@ function Admin() {
         .catch(() => {})
     })
 
+    const loadTeams = () => {
+      getTeamSettings()
+        .then((s) => {
+          if (alive) setEnabledTeams(s)
+        })
+        .catch(() => {})
+    }
+    loadTeams()
+    const unsubTeams = subscribeTeamSettings(loadTeams)
+
     return () => {
       alive = false
       unsub()
+      unsubTeams()
     }
   }, [])
+
+  const openTeamCount = TEAMS.filter((t) => enabledTeams[t.id] !== false).length
 
   const stats = useMemo(() => {
     const byTeam = {}
@@ -1172,6 +1272,22 @@ function Admin() {
     a.download = `hackjos2026-volunteers-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  const toggleTeam = async (teamId, enabled) => {
+    setSavingTeam(teamId)
+    setActionError('')
+    // Optimistic: reflect the change immediately, roll back on failure.
+    setEnabledTeams((prev) => ({ ...prev, [teamId]: enabled }))
+    try {
+      const next = await setTeamEnabled(teamId, enabled)
+      setEnabledTeams(next)
+    } catch (err) {
+      setEnabledTeams((prev) => ({ ...prev, [teamId]: !enabled }))
+      setActionError(err.message || 'Could not update the team.')
+    } finally {
+      setSavingTeam('')
+    }
   }
 
   const handleRemove = async (r) => {
@@ -1302,6 +1418,88 @@ function Admin() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Team availability — controls what the public form offers */}
+      <div className="admin-green mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="ag-chip">
+              <Users className="h-4 w-4" aria-hidden />
+            </span>
+            <div>
+              <h2 className="ag-heading text-[15px]">Team availability</h2>
+              <p className="ag-muted">
+                Switch a team off to hide it from the application form.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span
+              className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wider ${
+                openTeamCount === 0
+                  ? 'bg-red-400/20 text-red-200 border border-red-300/40'
+                  : openTeamCount < TEAMS.length
+                    ? 'bg-amber-300/20 text-amber-100 border border-amber-200/40'
+                    : 'bg-green-300/20 text-green-100 border border-green-200/40'
+              }`}
+            >
+              {openTeamCount === 0
+                ? 'Applications closed'
+                : `${openTeamCount}/${TEAMS.length} open`}
+            </span>
+          </div>
+        </div>
+
+        {openTeamCount === 0 && (
+          <p className="ag-card mt-3 flex items-start gap-2 text-[13px] text-red-100">
+            <AlertCircle className="mt-px h-4 w-4 shrink-0" aria-hidden />
+            Every team is switched off. The public form shows a closed notice and its
+            submit button is disabled.
+          </p>
+        )}
+
+        <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+          {TEAMS.map((t) => {
+            const on = enabledTeams[t.id] !== false
+            const busy = savingTeam === t.id
+            return (
+              <li key={t.id} className="ag-card flex items-center gap-3">
+                <span
+                  className="ag-avatar"
+                  style={{ background: on ? t.accent : 'rgba(255,255,255,0.12)' }}
+                >
+                  <t.icon className="h-4 w-4" strokeWidth={2.2} aria-hidden />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate ag-cell-strong text-[13.5px]">
+                    {t.name}
+                  </span>
+                  <span className="block truncate ag-cell-muted">
+                    {on ? 'Open on the form' : 'Hidden from volunteers'}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={on}
+                  aria-label={`${on ? 'Disable' : 'Enable'} ${t.name}`}
+                  disabled={busy}
+                  onClick={() => toggleTeam(t.id, !on)}
+                  className={`relative h-6 w-11 shrink-0 rounded-full transition disabled:opacity-60 ${
+                    on ? 'bg-leaf' : 'bg-white/20'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
+                      on ? 'left-[22px]' : 'left-0.5'
+                    }`}
+                  />
+                </button>
+              </li>
+            )
+          })}
+        </ul>
       </div>
 
       {/* Search + results live in one continuous green panel */}

@@ -149,6 +149,79 @@ export function subscribeVolunteers(onChange) {
   }
 }
 
+/* ---------- team availability settings ---------- */
+/*
+ * Admins can switch individual volunteer teams on or off. A team that is
+ * off is hidden from the public application form. If every team is off
+ * the form closes and the submit button is disabled.
+ *
+ * Shape: { [teamId]: boolean }. Teams with no row are treated as enabled,
+ * so a fresh install behaves normally before the table is seeded.
+ */
+
+const TEAM_SETTINGS_KEY = 'hackjos2026.teamSettings'
+
+function localTeamSettings() {
+  if (typeof window === 'undefined') return {}
+  try {
+    return JSON.parse(window.localStorage.getItem(TEAM_SETTINGS_KEY) || '{}') || {}
+  } catch {
+    return {}
+  }
+}
+
+export async function getTeamSettings() {
+  const sb = getSupabase()
+  if (!sb) return localTeamSettings()
+  const { data, error } = await sb.from('team_settings').select('team_id, enabled')
+  if (error) {
+    // A missing table should not break the public form.
+    console.warn('Could not read team_settings:', error.message)
+    return {}
+  }
+  const map = {}
+  for (const row of data ?? []) map[row.team_id] = row.enabled
+  return map
+}
+
+export async function setTeamEnabled(teamId, enabled) {
+  const sb = getSupabase()
+  if (!sb) {
+    const next = { ...localTeamSettings(), [teamId]: enabled }
+    window.localStorage.setItem(TEAM_SETTINGS_KEY, JSON.stringify(next))
+    return next
+  }
+  const { error } = await sb
+    .from('team_settings')
+    .upsert({ team_id: teamId, enabled }, { onConflict: 'team_id' })
+  if (error) throw new Error(`Could not update team: ${error.message}`)
+  return getTeamSettings()
+}
+
+/** Live team-setting changes (e.g. an admin toggling a team in another tab). */
+export function subscribeTeamSettings(onChange) {
+  const sb = getSupabase()
+  if (!sb) return () => {}
+  const channelName = `team-settings-live-${++realtimeSeq}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`
+  const channel = sb
+    .channel(channelName)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'team_settings' },
+      () => onChange(),
+    )
+  channel.subscribe()
+  return () => {
+    try {
+      sb.removeChannel(channel)
+    } catch {
+      /* already torn down */
+    }
+  }
+}
+
 /* ---------- admin passcode gate (session-only) ---------- */
 const ADMIN_KEY = 'hackjos2026.admin'
 

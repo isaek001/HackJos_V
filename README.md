@@ -123,6 +123,27 @@ surfaces), an `accentLight` (used on the dark admin panel) and a Lucide icon.
 | `ushering` | Ushering |
 | `welfare` | Welfare |
 
+### Switching a team off
+
+`#/admin` has a **Team availability** panel with a switch per team.
+
+- Off: that team is hidden from the public application form, and the sidebar
+  marks it "Closed".
+- All six off: the form shows a closed notice and the submit button is
+  disabled.
+- Changes are written to the `team_settings` table and pushed to the form over
+  Supabase Realtime, so an open form updates without a reload.
+
+`team_settings` is seeded with every team enabled, so a fresh install behaves
+normally. A team with no row at all is also treated as enabled, which keeps the
+form working if the table is missing or unreachable.
+
+> Because `team_settings` is writable by `anon` (the admin dashboard
+> authenticates with the publishable key), anyone who can load the page can also
+> flip these switches. Restricting the panel to an authenticated admin role
+> would close that gap along with the rest of the `select` / `delete` exposure
+> described above.
+
 ---
 
 ## Project structure

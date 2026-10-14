@@ -169,6 +169,12 @@
   background: rgb(255 255 255 / 0.17);
   border-color: rgb(255 255 255 / 0.45);
 }
+/* Team availability has not loaded yet: the tiles are visible but inert,
+   so the picker cannot be used to choose a team that may be closed. */
+.form-green [data-pending="true"] .tile {
+  opacity: 0.55;
+  pointer-events: none;
+}
 .form-green .tile[data-active="true"] {
   background: rgb(255 255 255 / 0.2);
   border-color: rgb(255 255 255 / 0.85);
@@ -816,4 +822,17 @@
   .hackjos-logo-on-dark {
     height: 1.75rem;
   }
+}
+
+.panel-green .pg-closed {
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+  background: rgb(255 255 255 / 0.12);
+  border: 1px solid rgb(255 255 255 / 0.2);
+  color: rgb(255 255 255 / 0.75);
+  padding: 0.125rem 0.5rem;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
