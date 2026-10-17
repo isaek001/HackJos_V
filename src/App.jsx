@@ -24,6 +24,7 @@ import {
 import { TEAMS, teamById } from './data/teams.js'
 import {
   clearVolunteers,
+  DuplicateEmailError,
   getVolunteers,
   isAdminUnlocked,
   lockAdmin,
@@ -518,9 +519,20 @@ function ApplicationForm({
       })
       onSubmitted(record)
     } catch (err) {
-      setSubmitError(
-        err?.message || 'We could not submit your application. Please try again.',
-      )
+      // A rejected field (e.g. an email that has already applied) is shown
+      // inline on that input; anything else uses the failure banner.
+      if (err instanceof DuplicateEmailError || err?.field) {
+        const field = err.field || 'email'
+        setErrors((prev) => ({ ...prev, [field]: err.message }))
+        setSubmitError('')
+        const target = document.getElementById(`v-${field}`)
+        target?.focus({ preventScroll: true })
+        target?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      } else {
+        setSubmitError(
+          err?.message || 'We could not submit your application. Please try again.',
+        )
+      }
       submittingRef.current = false
     } finally {
       setSaving(false)
@@ -615,6 +627,11 @@ function ApplicationForm({
             error={hasError('email')}
             maxLength={120}
           />
+          {!hasError('email') && (
+            <p className="fg-sub mt-1.5 text-[12.5px]">
+              One application per email address, so a repeat is easy to spot.
+            </p>
+          )}
           <Field
             id="v-phone"
             label="Phone number"

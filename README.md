@@ -92,6 +92,24 @@ run it.
 Indexes exist on `team` and `created_at DESC` to support the admin filters and
 newest-first ordering.
 
+### One application per email
+
+`volunteers_email_unique_idx` is a unique index over `lower(btrim(email))`, so
+one person can only apply once. Addresses are compared case-insensitively and
+ignoring surrounding whitespace, meaning `Ada@x.com` and ` ada@x.com ` are the
+same address.
+
+The index is on **email, not name**, because name is not a reliable identity:
+one of the duplicate applications found in the live data spelled the name
+differently across two attempts ("Mgbe Miracle Ekorosowo" / "Miracle Mgbe")
+while reusing the same address. Two different people can also legitimately
+share a name, so a name constraint would reject real applicants.
+
+The same migration deletes any pre-existing duplicates, keeping the earliest
+`created_at` for each address. When the insert is rejected the form shows
+*"This email address has already been applied with."* inline on the email
+input rather than as a generic failure.
+
 ### Row Level Security
 
 RLS is enabled with three policies for the `anon` role:

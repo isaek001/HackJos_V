@@ -8,6 +8,22 @@ import { getSupabase, isSupabaseConfigured } from './supabase.js'
 
 export const isBackendLive = () => isSupabaseConfigured
 
+/**
+ * Raised when an email address has already been applied with. Carries the
+ * form field so the form can show the message inline on that input instead
+ * of in the generic failure banner.
+ */
+export class DuplicateEmailError extends Error {
+  constructor(message = 'This email address has already been applied with.') {
+    super(message)
+    this.name = 'DuplicateEmailError'
+    this.field = 'email'
+  }
+}
+
+/** Matches how the database compares addresses: trimmed, case-insensitive. */
+const normaliseEmail = (value) => String(value ?? '').trim().toLowerCase()
+
 /* ---------- mapping: DB (snake_case) <-> app (camelCase) ---------- */
 const toRecord = (row) => ({
   id: row.id,
@@ -73,12 +89,21 @@ export async function getVolunteers() {
 
 export async function saveVolunteer(entry) {
   const sb = getSupabase()
-  if (!sb) return localSave(entry)
+  if (!sb) {
+    // localStorage has no unique index, so mirror the rule by hand.
+    const seen = normaliseEmail(entry.email)
+    if (localAll().some((v) => normaliseEmail(v.email) === seen)) {
+      throw new DuplicateEmailError()
+    }
+    return localSave(entry)
+  }
   const { data, error } = await sb
     .from('volunteers')
     .insert(toRow(entry))
     .select()
     .single()
+  // 23505 = unique_violation, raised by volunteers_email_unique_idx.
+  if (error?.code === '23505') throw new DuplicateEmailError()
   if (error) throw new Error(`Could not save application: ${error.message}`)
   return toRecord(data)
 }
@@ -90,8 +115,20 @@ export async function removeVolunteer(id) {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
     return next
   }
-  const { error } = await sb.from('volunteers').delete().eq('id', id)
+  // Ask PostgREST to return what it removed so we can prove the filter
+  // matched a single row. Removing one person must never touch the rest.
+  const { data, error } = await sb
+    .from('volunteers')
+    .delete()
+    .eq('id', id)
+    .select('id')
   if (error) throw new Error(`Could not remove volunteer: ${error.message}`)
+  if (!data || data.length === 0) {
+    throw new Error('That volunteer was already removed. Refresh to see the latest list.')
+  }
+  if (data.length > 1) {
+    throw new Error('Stopped: that would have removed more than one entry.')
+  }
   return getVolunteers()
 }
 
