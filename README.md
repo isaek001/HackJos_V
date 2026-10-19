@@ -131,10 +131,14 @@ RLS is enabled with three policies for the `anon` role:
 
 Defined in `src/data/teams.js`. Each team carries an `accent` (used on light
 surfaces), an `accentLight` (used on the dark admin panel) and a Lucide icon.
+Adding a team means appending to `TEAMS` and inserting a `team_settings` row;
+the team counts shown in the UI are derived from `TEAMS.length`, so nothing
+else needs updating.
 
 | id | Team |
 | --- | --- |
 | `technical` | Technical |
+| `media` | Media |
 | `mentors` | 48hr Challenge Mentors |
 | `swags` | Swags |
 | `registration` | Registration |

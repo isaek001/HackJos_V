@@ -1,4 +1,5 @@
 import {
+  Camera,
   Cpu,
   Megaphone,
   HeartHandshake,
@@ -24,6 +25,18 @@ export const TEAMS = [
     duties: ['AV & stage setup', 'Network and power', 'On-call support'],
     accent: '#0B3D2A',
     accentLight: '#7fe3b0',
+  },
+  {
+    id: 'media',
+    name: 'Media',
+    tag: 'MD',
+    icon: Camera,
+    short: 'Photos, video & social',
+    blurb:
+      'Tell the story of the 48 hours — photos, video, and the social posts that keep the energy up before, during and after the sprint.',
+    duties: ['Photo & video coverage', 'Social media posts', 'Event documentation'],
+    accent: '#6D28D9',
+    accentLight: '#c9b8fd',
   },
   {
     id: 'mentors',

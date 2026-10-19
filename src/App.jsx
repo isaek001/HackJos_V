@@ -996,7 +996,7 @@ function TeamsReference({ selected, enabledTeams }) {
   const open = TEAMS.filter((t) => enabledTeams[t.id] !== false)
   return (
     <div className="panel-green">
-      <h3 className="pg-title">The six teams</h3>
+      <h3 className="pg-title">The {TEAMS.length} teams</h3>
       <p className="pg-body mt-1.5 mb-3">
         {open.length === 0
           ? 'Applications are closed at the moment.'
@@ -1134,7 +1134,7 @@ function Site() {
           <p className="mt-3 max-w-xl text-[15.5px] leading-relaxed text-[var(--color-muted)] md:text-base">
             Join the crew behind Nigeria&apos;s agritech hackathon —{' '}
             <span className="font-medium text-[var(--color-ink)]">Nov 4–6, Jos</span>. Fill the
-            form once, pick one of the six teams, and we&apos;ll take it from there.
+            form once, pick one of the {TEAMS.length} teams, and we&apos;ll take it from there.
           </p>
           <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-[var(--color-muted)]">
             <span className="inline-flex items-center gap-1.5">
