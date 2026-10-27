@@ -16,7 +16,8 @@ import {
   RefreshCw,
   Rocket,
   Search,
-  ShieldCheck,  Trash2,
+  ShieldCheck,
+  Trash2,
   Users,
   UtensilsCrossed,
   X,
@@ -203,7 +204,7 @@ function Navbar({ route, count }) {
 
         {/* Actions */}
         <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
-          {route === 'site' ? (
+          {/* {route === 'site' ? (
             <>
               <a
                 href="#apply"
@@ -234,7 +235,7 @@ function Navbar({ route, count }) {
               <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
               Volunteer form
             </a>
-          )}
+          )} */}
 
           {route === 'site' && (
             <button
@@ -275,14 +276,6 @@ function Navbar({ route, count }) {
             >
               {route === 'site' ? (
                 <>
-                  <a
-                    href="#apply"
-                    onClick={() => setOpen(false)}
-                    className="btn btn-primary btn-lg w-full shrink-0"
-                  >
-                    Join as a Volunteer
-                    <ArrowRight className="h-4 w-4" aria-hidden />
-                  </a>
                   <a
                     href="#/admin"
                     onClick={(e) => {
